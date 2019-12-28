@@ -4,35 +4,42 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Qcloud\Cos\Client;
+use App\Setting;
 
 class UploadController extends Controller
 {
-  /**
-   * 默认上传，使用腾讯云静态存储
-   * images-1253193383
-   *
-   * @return \Illuminate\Http\Response
-   */
-  public function upload_api(Request $request)
-  {
-    $cosClient = new Client(array('region' => env('COS_REGION'),
-    'credentials'=> array(
-        'appId' => env('COS_APPID'),
-        'secretId' => env('COS_KEY'),
-        'secretKey' => env('COS_SECRET'))));
+    /**
+    * 根据设置的存储盘存储
+    */
+    static public function uploadFile($file)
+    {
+        $fileName = md5_file($file).'.'.$file->extension();
 
-    try {
-        $result = $cosClient->putObject(array(
-            'Bucket' => 'images-1253193383',
-            'Key' => md5_file($request->file).'.'.$request->file->extension(),
-            'Body' => file_get_contents($request->file),
-            'ServerSideEncryption' => 'AES256'));
-        return response()->json([
-            'message' => '上传成功!',
-            'ObjectURL' => $result['ObjectURL']
-        ]);
-    } catch (\Exception $e) {
-        echo "$e\n";
+        $file_disk = Setting::where('key', 'file_disk')->value('value');
+        if ($file_disk == 'cos') {
+            //使用：腾讯云静态存储 COS
+            $cosClient = new Client(array('region' => env('COS_REGION'),
+            'credentials'=> array(
+                'appId' => env('COS_APPID'),
+                'secretId' => env('COS_KEY'),
+                'secretKey' => env('COS_SECRET'))));
+
+            $result = $cosClient->putObject(array(
+                'Bucket' => env('COS_BUCKET'),
+                'Key' => $fileName,
+                'Body' => file_get_contents($file),
+                'ServerSideEncryption' => 'AES256'));
+
+            //return $result['ObjectURL']; 此项可生成 COS 完整地址
+        }else {
+            //使用：默认 Storage local 存储
+            $file->storeAs('public/images', $fileName);
+        }
+
+        return $fileName;
     }
-  }
+    public function uploadFileApi(Request $request)
+    {
+        return $this->uploadFile($request->file);
+    }
 }

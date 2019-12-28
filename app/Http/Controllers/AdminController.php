@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use App\Visit;
 use App\Count;
+use App\User;
+use App\Setting;
 
 class AdminController extends Controller
 {
@@ -28,7 +30,16 @@ class AdminController extends Controller
      */
     public function index()
     {
-        return view('admin');
+        //挂载博主信息
+        $master = User::findOrFail(1);
+
+        //挂载存储盘信息
+        $file_disk = Setting::where('key', 'file_disk')->value('value');
+
+        return view('admin', [
+            'master' => $master,
+            'file_disk' => $file_disk
+        ]);
     }
 
     /**

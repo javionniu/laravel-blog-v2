@@ -1,160 +1,55 @@
 import React, { Component } from 'react';
-import { Icon, Form, Input, Button, Upload, message, Modal, Badge, Select } from 'antd';
+import { Icon, Form, Input, Button, Upload, message, Modal, Badge, Select, Switch, Popover } from 'antd';
+import BraftEditor from 'braft-editor';
+import ReactMarkdown from 'react-markdown';
+import {markdown} from 'markdown';
+import upndown from 'upndown';
+import 'braft-editor/dist/index.css'
 const FormItem = Form.Item;
 const { TextArea } = Input;
 const Option = Select.Option;
-import BraftEditor from 'braft-editor'
-import 'braft-editor/dist/braft.css'
-import styles from "./ArticleForm.css"
-
-class CoverUploader extends React.Component {
-  render() {
-    const props = {
-      action: 'z/upload',
-      listType: 'picture',
-      defaultFileList: [...this.props.coverList],
-      headers:{
-        'X-CSRF-TOKEN':document.head.querySelector('meta[name="csrf-token"]').content
-      }
-    };
-    return (
-      <div>
-        <Upload {...props} onChange={this.props.coverChanged}>
-          <Button>
-            <Icon type="upload" /> 点此上传
-          </Button>
-        </Upload>
-      </div>
-    )
-  }
-}
+const ButtonGroup = Button.Group;
 
 export class ArticleForm extends React.Component {
   constructor(props) {
     super();
     this.state = {
-      //封面文件列表缓存
-      coverList:[],
       //表单
+      id: 0,
       title: '',
       tags: [],
       cover: '',
-      content: '',
-      //分享Modal
-      share_content: '',
-      share_type: 'html',
-      shareContentModalvisible: false,
+      editorState: BraftEditor.createEditorState(null),
+      editorMarkdown: '',
+
       //可选标签
-      tags_arr: [],
+      tagsArr: [],
+
+      //上传封面控件
+      loading: false,
+
+      // Modal
+      visibleCoverUploadModal: false
     };
   }
   componentWillReceiveProps(nextProps) {
     if (nextProps.article) {
       this.setState({
+        id: nextProps.article.id,
         title: nextProps.article.title,
         tags: nextProps.article.tags,
         cover: nextProps.article.cover,
-        content: nextProps.article.content,
-        share_content: nextProps.article.content,
+        editorState: BraftEditor.createEditorState(nextProps.article.content_raw),
+        editorMarkdown: nextProps.article.content_markdown,
       });
     }
-    if (nextProps.tags_arr) {
-      this.setState({
-        tags_arr: nextProps.tags_arr,
-      });
+    if (nextProps.tagsArr) {
+      this.setState({tagsArr: nextProps.tagsArr});
     }
-  }
-  handelTitleChange = (e) => {
-    let title = this.refs.title.input.value
-    this.setState({title: title})
-  }
-  handleTagsChange = (value) => {
-    this.setState({tags: value})
-  }
-  handleChange = (content) => {
-    console.log(content);
-  }
-  handleHTMLChange = (html) => {
-    console.log(html);
-    this.setState({
-      content: html,
-      share_content:html
-    })
-  }
-  uploadFn = (param) => {
-    const serverURL = 'z/upload'
-    const xhr = new XMLHttpRequest
-    const fd = new FormData()
-    // libraryId可用于通过mediaLibrary示例来操作对应的媒体内容
-    console.log(param.libraryId)
-    const successFn = (response) => {
-      // 假设服务端直接返回文件上传后的地址
-      // 上传成功后调用param.success并传入上传后的文件地址
-      param.success({
-        url: JSON.parse(xhr.responseText).ObjectURL
-      })
-    }
-    const progressFn = (event) => {
-      // 上传进度发生变化时调用param.progress
-      param.progress(event.loaded / event.total * 100)
-    }
-    const errorFn = (response) => {
-      // 上传发生错误时调用param.error
-      param.error({
-        msg: 'unable to upload.'
-      })
-    }
-    xhr.upload.addEventListener("progress", progressFn, false)
-    xhr.addEventListener("load", successFn, false)
-    xhr.addEventListener("error", errorFn, false)
-    xhr.addEventListener("abort", errorFn, false)
-
-    fd.append('file', param.file)
-    xhr.open('POST', serverURL, true)
-    xhr.setRequestHeader('X-CSRF-TOKEN', document.head.querySelector('meta[name="csrf-token"]').content);
-    xhr.send(fd)
-  }
-  coverChanged(event) {
-    if (event.file.response) {
-      this.setState({
-        coverList:event.fileList,
-        cover:event.file.response.ObjectURL
-      })
-    }
-  }
-  shareContent() {
-    var that = this
-    if (this.state.share_type == 'markdown') {
-      this.setState({
-        share_content:this.state.content,
-        share_type:'html'
-      })
-    }else {
-      //html 转 markdown
-      axios.post('z/articles/markdown', {
-        content:this.state.content,
-      })
-      .then(function (response) {
-        console.log(response);
-        that.setState({
-          share_content: response.data,
-          share_type: 'markdown'
-        })
-      })
-      .catch(function (error) {
-        console.log(error);
-      });
-    }
-  }
-  showShareContentModal = () => {
-    this.setState({
-      shareContentModalvisible: true,
-    });
-  }
-  handleShareContentCancel = (e) => {
-    this.setState({shareContentModalvisible: false});
+    this.setState({isMarkdown:nextProps.isMarkdown});
   }
   render() {
+    //表单布局
     const formItemLayout = {
       wrapperCol: {
         sm:{ span:24 },
@@ -162,55 +57,82 @@ export class ArticleForm extends React.Component {
         lg:{ span: 20, offset: 2 }
       },
     };
-    const editorProps = {
-      height: 350,
-      contentFormat:'html',
-      initialContent: this.state.content,
-      onChange: this.handleChange,
-      onHTMLChange: this.handleHTMLChange,
-      media:{
-        uploadFn:this.uploadFn
-      },
-      controls:[
-        'undo', 'redo', 'split', 'font-size', 'font-family', 'text-color',
-        'bold', 'italic', 'underline', 'strike-through', 'emoji', 'superscript',
-        'subscript', 'text-align', 'split', 'headings', 'list_ul', 'list_ol',
-        'blockquote', 'code', 'split', 'link', 'split', 'media'
-      ],
-      extendControls: [{
-          type: 'split'
-        },{
-          type: 'modal',
-          text: '封面',
-          title: '更新封面图片',
-          onClick: () => console.log(4),
-          modal: {
-            id: 'cover-modal',
-            title: '上传文章封面图片',
-            showClose: true,
-            showCancel: false,
-            showConfirm: false,
-            children: (
-              <div style={{width: 480, height: 160, padding: 20}}>
-                <CoverUploader coverList={this.state.coverList} coverChanged={this.coverChanged.bind(this)} />
-              </div>
-            )
-          }
-        },{
-          type: 'button',
-          text: (<Icon type="share-alt" />),
-          title: '导出 Html 或 Markdown 格式内容',
-          onClick: () => {
-            this.showShareContentModal()
-          }
-        }]
-    };
     //可选标签
     const children = [];
-    var tags_arr = this.state.tags_arr;
-    for (var i = 0; i < tags_arr.length; i++) {
-      children.push(<Option key={tags_arr[i]}>{tags_arr[i]}</Option>);
-    }
+    this.state.tagsArr.map((tag) => {
+      children.push(<Option key={tag}>{tag}</Option>)
+    })
+    // 封面上传组件
+    const CoverUploader = (
+      <div style={{width: 400, padding: '0 10px'}}>
+        <Upload
+          name="file"
+          listType="picture-card"
+          showUploadList={false}
+          className="article__cover-uploader"
+          action={window.apiURL+'upload'}
+          beforeUpload={this.beforeUpload}
+          onChange={this.handleChange}
+          headers={{
+            'X-CSRF-TOKEN':document.head.querySelector('meta[name="csrf-token"]').content
+          }}
+        >
+          {this.state.cover&&!this.state.loading ?
+            <img src={imageURL(this.state.cover)} alt="avatar" style={{width:'100%'}} /> :
+            (<div style={{width:'100%'}}>
+                <Icon type={this.state.loading ? 'loading' : 'plus'} />
+                <div className="ant-upload-text">Upload</div>
+              </div>)
+          }
+        </Upload>
+      </div>
+    )
+		const ExportMarkdown = () => {
+			return (
+				<div style={{width: 400, padding: 10}}>
+					<TextArea rows={6} value={this.state.html2markdown || ''} />
+				</div>
+			)
+		}
+    // editor 扩展控件
+    const extendControls = [
+      {
+        key: 'custom-modal',
+        type: 'modal',
+        text: '文章封面上传',
+        modal: {
+          id: 'my-moda-1',
+          title: '文章封面设置',
+          showFooter: false,
+          children: CoverUploader,
+        }
+      },
+			{
+        key: 'custom-modal2',
+        type: 'modal',
+        text: '导出 Markdown',
+        modal: {
+          id: 'my-moda-2',
+          title: '导出 Markdown',
+          showFooter: false,
+          children: <ExportMarkdown />,
+				},
+				onClick: () => {
+					var und = new upndown();
+					und.convert(this.state.editorState.toHTML(), (err, markdown) => {
+					    if(err) {
+								console.log(err);
+							}
+					    else {
+								this.setState({
+									html2markdown: markdown
+								})
+							}
+					});
+				}
+      }
+    ]
+
     return (
       <Form>
         <FormItem
@@ -234,31 +156,74 @@ export class ArticleForm extends React.Component {
             {children}
           </Select>
         </FormItem>
-        <FormItem {...formItemLayout}>
-          <div  style={{ borderRadius: 5, boxShadow: 'inset 0 0 0 0.5px rgba(0, 0, 0, 0.3), 0 10px 20px rgba(0, 0, 0, 0.1)'}}>
-            <BraftEditor {...editorProps}/>
-            <Modal
-              title="导出 Html 或 Markdown 格式内容"
-              visible={this.state.shareContentModalvisible}
-              onCancel={this.handleShareContentCancel}
-              footer={null}
-            >
-              <TextArea autosize={{ minRows: 2, maxRows: 6 }} value={this.state.share_content} style={{marginBottom:10}} />
-              <div>
-                <Badge status="success" text={this.state.share_type} />
-                <Button type="primary" onClick={this.shareContent.bind(this)} icon="swap" style={{float:'right'}}>转换</Button>
+        {
+          this.state.isMarkdown?
+          (
+            <FormItem
+              {...formItemLayout}>
+              <Switch checkedChildren="预览" unCheckedChildren="编辑" onChange={v => this.setState({preview:v})} />
+              <ButtonGroup style={{marginLeft:20}}>
+                <Button size="small" onClick={() => document.getElementById('imageUploader').click()}>
+                  <Icon type="picture" />插入图片
+                </Button>
+                <input type="file" id="imageUploader" name="file" onChange={this.uploadImage} style={{display:'none'}}/>
+                <Button size="small" onClick={() => this.setState({visibleCoverUploadModal:true})}>
+                  <Icon type="pushpin" />文章封面上传
+                </Button>
+                <Modal
+                  title="文章封面上传"
+                  visible={this.state.visibleCoverUploadModal}
+                  onCancel={() => this.setState({visibleCoverUploadModal:false})}
+                  footer={null}
+                >
+                  {CoverUploader}
+                </Modal>
+              </ButtonGroup>
+              <a href="http://rexxars.github.io/react-markdown/" target="_blank">
+                <Button icon="question" size="small" style={{marginLeft:20}}>Markdown 语法示例</Button>
+              </a>
+              {
+                this.state.preview?
+                (
+                  <ReactMarkdown
+                    className="article__markdown-preview"
+                    source={this.state.editorMarkdown}/>
+                ):
+                (
+                  <TextArea
+                    id="textarea"
+                    autosize={{ minRows: 20, maxRows: 25 }}
+                    value={this.state.editorMarkdown}
+                    onChange={this.handleTextAreaChange}
+                    />
+                )
+              }
+            </FormItem>
+          ):
+          (
+            <FormItem {...formItemLayout}>
+              <div  style={{ borderRadius: 5, boxShadow: 'inset 0 0 0 0.5px rgba(0, 0, 0, 0.3), 0 10px 20px rgba(0, 0, 0, 0.1)'}}>
+                <BraftEditor
+                  value={this.state.editorState}
+                  onChange={this.handleEditorChange}
+                  extendControls={extendControls}
+                  media={{
+                    uploadFn:this.uploadFn,
+                    accepts:{
+                      image: 'image/png,image/jpeg,image/gif,image/webp,image/apng,image/svg',
+                      video: false,
+                      audio: false
+                    }
+                  }}
+                  onSave={this.handleSubmit}
+                />
               </div>
-            </Modal>
-          </div>
-        </FormItem>
+            </FormItem>
+          )
+        }
         <FormItem {...formItemLayout} style={{textAlign:'right'}}>
           <Button
-            onClick={this.props.handleSubmit.bind(this, {
-              title:this.state.title,
-              tags:this.state.tags,
-              cover:this.state.cover,
-              content:this.state.content,
-            })}
+            onClick={this.handleSubmit}
             type="primary"
             htmlType="submit"
             icon="form"> 保存
@@ -267,4 +232,127 @@ export class ArticleForm extends React.Component {
       </Form>
     )
   }
+  //保存
+  handleSubmit = () => {
+    this.props.handleSubmit({
+      id:this.state.id,
+      title:this.state.title,
+      tags:this.state.tags,
+      cover:this.state.cover,
+      content_raw:this.state.editorState.toRAW(),
+      content_html:this.state.isMarkdown?markdown.toHTML(this.state.editorMarkdown):this.state.editorState.toHTML(),
+      content_markdown:this.state.editorMarkdown,
+      is_markdown:this.state.isMarkdown,
+    })
+  }
+  //标题改变处理
+  handelTitleChange = (e) => {
+    let title = this.refs.title.input.value
+    this.setState({title: title})
+  }
+  //标签改变处理
+  handleTagsChange = (value) => {
+    this.setState({tags: value})
+  }
+  //editor 改变处理
+  handleEditorChange = (editorState) => {
+      this.setState({ editorState })
+  }
+  //editor 上传图片函数
+  uploadFn = (param) => {
+    const serverURL = window.apiURL + 'upload'
+    const xhr = new XMLHttpRequest
+    const fd = new FormData()
+
+    const successFn = (response) => {
+      // 假设服务端直接返回文件上传后的地址
+      // 上传成功后调用param.success并传入上传后的文件地址
+      param.success({
+        url: imageURL(xhr.responseText)
+      })
+    }
+    const progressFn = (event) => {
+      // 上传进度发生变化时调用param.progress
+      param.progress(event.loaded / event.total * 100)
+    }
+    const errorFn = (response) => {
+      // 上传发生错误时调用param.error
+      param.error({
+        msg: '上传失败！'
+      })
+    }
+    xhr.upload.addEventListener("progress", progressFn, false)
+    xhr.addEventListener("load", successFn, false)
+    xhr.addEventListener("error", errorFn, false)
+    xhr.addEventListener("abort", errorFn, false)
+
+    fd.append('file', param.file)
+    xhr.open('POST', serverURL, true)
+    xhr.setRequestHeader('X-CSRF-TOKEN', document.head.querySelector('meta[name="csrf-token"]').content);
+    xhr.send(fd)
+  }
+  //上传封面前的校验
+  beforeUpload = (file) => {
+    const allowType = ["image/png", "image/jpeg"];
+    const isJPGPNG = ~allowType.indexOf(file.type);
+    if (!isJPGPNG) {
+      message.error('仅支持上传JPG，PNG格式的图片！');
+    }
+    const isLt2M = file.size / 1024 / 1024 < 2;
+    if (!isLt2M) {
+      message.error('仅支持上传小于2MB的图片！');
+    }
+    return isJPGPNG && isLt2M;
+  }
+  //上传封面
+  handleChange = (info) => {
+    if (info.file.status === 'uploading') {
+      this.setState({ loading: true });
+      return;
+    }
+    if (info.file.status === 'done') {
+      this.setState({
+        cover: info.file.response,
+        loading: false,
+      });
+      message.success('上传成功，保存后生效哦！')
+    }
+  }
+  // markdown 编辑器change函数
+  handleTextAreaChange = (e) => {
+    this.setState({editorMarkdown: e.target.value});
+  }
+  // markdown 编辑器上传图片
+  uploadImage = (e) => {
+    let textarea = document.getElementById('textarea');
+    let data = new FormData();
+    data.append('file', e.target.files[0]);
+    axios.post(window.apiURL+'upload', data)
+    .then((response) => {
+      let url = `![](${imageURL(response.data)})`;
+      this.insertText(textarea, url);
+      this.setState({editorMarkdown: textarea.value});
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  }
+  //在 textarea 光标位置处插入文字
+  insertText = (obj,str) => {
+      if (document.selection) {
+          var sel = document.selection.createRange();
+          sel.text = str;
+      } else if (typeof obj.selectionStart === 'number' && typeof obj.selectionEnd === 'number') {
+          var startPos = obj.selectionStart,
+              endPos = obj.selectionEnd,
+              cursorPos = startPos,
+              tmpStr = obj.value;
+          obj.value = tmpStr.substring(0, startPos) + str + tmpStr.substring(endPos, tmpStr.length);
+          cursorPos += str.length;
+          obj.selectionStart = obj.selectionEnd = cursorPos;
+      } else {
+          obj.value += str;
+      }
+  }
+  //new function
 }

@@ -3,6 +3,13 @@
 
 // Bootstrap
 @import "~bootstrap-sass/assets/stylesheets/bootstrap";
+//首页
+.z-home-more-articles{
+	float: right;
+	font-size: 17px;
+	color: #8c8c8c;
+	margin-bottom: 20px;
+}
 //----------------------------------------------------------
 //------------------     轮播
 //----------------------------------------------------------
@@ -175,6 +182,9 @@
   }
   .z-counter{
     margin-top: 20px;
+    a{
+      float: right;
+    }
   }
 }
 
@@ -191,7 +201,7 @@
     height:30px;
     width:30px;
     border-radius:15px;
-    background-color:gray;
+    background-color:#bfbfbf;
     float:left;
     text-align:center;
     line-height:30px;

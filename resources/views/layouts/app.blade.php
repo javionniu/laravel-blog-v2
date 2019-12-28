@@ -19,7 +19,7 @@
     <!-- CSRF Token -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', config('app.name', 'Laravel'))</title>
+    <title>@yield('title', setting('web_name', 'Laravel'))</title>
 
     <!-- Styles -->
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
@@ -44,7 +44,7 @@
                     </a>
 
                     <div class="navbar-brand visible-xs-block" style="padding:4px 0 0 50px">
-                      <form class="navbar-form navbar-left search" style="margin:0;border:0;float:right" role="search" action="{{ route('articles.search') }}" method="post">
+                      <form class="navbar-form navbar-left search" style="margin:0;border:0;float:right" role="search" action="{{ route('articles.search.post') }}" method="post">
                           {{ csrf_field() }}
                           <div class="form-group">
                               <span class="glyphicon glyphicon-search" style="line-height:inherit"></span>
@@ -58,12 +58,13 @@
                     <!-- Left Side Of Navbar -->
                     <ul class="nav navbar-nav">
                         <li><a href="{{ route('articles.list') }}">全部文章</a></li>
+                        <li><a href="https://github.com/SadCreeper/laravel-blog-v2" target="_blank"><img src="/icons/github.png" alt="" style="width:18px;margin-bottom:3px"></a></li>
                     </ul>
 
                     <!-- Right Side Of Navbar -->
                     <ul class="nav navbar-nav navbar-right">
                         <li class="hidden-xs" style="margin-top:6px">
-                            <form class="navbar-form navbar-left search" role="search" action="{{ route('articles.search') }}" method="post">
+                            <form class="navbar-form navbar-left search" role="search" action="{{ route('articles.search.post') }}" method="post">
                                 {{ csrf_field() }}
                                 <div class="form-group">
                                     <span class="glyphicon glyphicon-search"></span>
@@ -111,6 +112,9 @@
         <footer class="z-footer">
             <p class="z-text">DESIGN & FRONT-END CODE BY</p>
             <p class="z-text-big">sad creeper</p>
+            @if(setting('web_icp', ''))
+              <a href="http://www.miitbeian.gov.cn" target="_blank">{{setting('web_icp', '')}}</a>
+            @endif
         </footer>
     </div>
 
